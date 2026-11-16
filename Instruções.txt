@@ -1,0 +1,14 @@
+1. Extraia o ZIP do material para uma pasta no computador.
+2. Coloque o arquivo uniaassist_pln.py que gerei nessa pasta, substituindo o Python original. Os arquivos devem ficar juntos:
+   - uniaassist_pln.py
+   - mensagens.csv
+   - desafios.csv
+   - requirements.txt
+   - parecer.txt
+   Se o download vier com (1) no nome, renomeie para uniaassist_pln.py.
+3. No VS Code, clique em Arquivo → Abrir Pasta e selecione essa pasta.
+4. Abra Terminal → Novo Terminal e instale as dependências:
+   python -m pip install -r requirements.txt
+5. Depois, execute:
+   python uniaassist_pln.py
+Os resultados aparecerão no terminal: quantidade de mensagens, métricas, matrizes de confusão e classificação dos oito desafios. O programa não abre uma interface gráfica.

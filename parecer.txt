@@ -1,0 +1,174 @@
+PARECER TÉCNICO — CLASSIFICADOR DE MENSAGENS DA UNIASSIST
+
+1. OBJETIVO E EXECUÇÃO
+Comparar regras por palavras-chave com TF-IDF + LinearSVC para encaminhar
+mensagens a Estágio, Financeiro, Matrícula ou Suporte.
+
+O código completa o material fornecido, sem modificar os CSVs ou os rótulos.
+Para executar, coloque uniaassist_pln.py na pasta do material, junto de
+mensagens.csv, desafios.csv e requirements.txt. Instale as dependências com
+python -m pip install -r requirements.txt e execute python uniaassist_pln.py.
+No GitHub, inclua também os CSVs e requirements.txt originais para que outra
+pessoa consiga reproduzir a execução. Este parecer está em TXT, conforme pedido.
+Resultados obtidos com scikit-learn 1.8.0, compatível com o requirements.txt.
+
+2. PREPARAÇÃO E MÉTODOS
+A base contém 80 mensagens fictícias: 20 por categoria. A divisão estratificada
+usa test_size=0.25 e random_state=42: 60 mensagens de treino (15 por categoria)
+e 20 de teste (5 por categoria). Os dois métodos usam o mesmo teste.
+
+Regras: utiliza as palavras-chave originais, converte a mensagem com casefold()
+e conta quantos termos distintos de cada setor aparecem no texto. A maior
+pontuação vence; empate ou nenhuma correspondência retorna Revisão humana.
+É uma busca por trechos: "disciplina" também aparece em "disciplinas", e
+"matrícula" aparece em "rematrícula". Isso é simples, mas pode distorcer a
+contagem. Não há remoção de acentos nem compreensão de sinônimos ou contexto.
+
+Machine Learning (ML): pipeline com TfidfVectorizer(ngram_range=(1, 2),
+lowercase=True) e LinearSVC(random_state=42). O TF-IDF e o classificador são
+ajustados somente com o treino, evitando vazamento das mensagens do teste.
+Os desafios não são usados no treinamento nem na definição das regras.
+
+3. RESULTADOS NO TESTE
+Método                         Acertos/total   Acurácia
+Regras                         16/20          80,00%
+TF-IDF + LinearSVC (1, 2)       14/20          70,00%
+TF-IDF + LinearSVC (1, 1)       14/20          70,00%
+
+As regras encaminharam 4/20 mensagens (20%) para revisão. Essas quatro contam
+como não acerto automatizado. As outras 16 foram classificadas corretamente.
+Portanto, a cobertura automática foi 80%; os 100% de acerto entre os casos
+respondidos não devem ser confundidos com a acurácia sobre todo o teste.
+O ML principal respondeu às 20 mensagens, mas errou seis.
+
+Relatório por categoria — ML principal:
+Categoria     Precisão   Recall    F1        Quantidade real
+Estágio       0,7143     1,0000    0,8333    5
+Financeiro    0,5000     0,4000    0,4444    5
+Matrícula     0,7500     0,6000    0,6667    5
+Suporte       0,8000     0,8000    0,8000    5
+Média macro   0,6911     0,7000    0,6861    20
+Média pond.   0,6911     0,7000    0,6861    20
+
+Relatório por categoria — regras:
+Categoria       Precisão   Recall    F1        Quantidade real
+Estágio         1,0000     0,8000    0,8889    5
+Financeiro      1,0000     1,0000    1,0000    5
+Matrícula       1,0000     0,8000    0,8889    5
+Suporte         1,0000     0,6000    0,7500    5
+Revisão humana  0,0000     0,0000    0,0000    0
+Média macro     0,8000     0,6400    0,7056    20
+Média pond.     1,0000     0,8000    0,8819    20
+
+Precisão indica quantas previsões de uma categoria estavam corretas. Recall
+indica quantas mensagens reais daquela categoria foram recuperadas. F1 combina
+as duas medidas. O suporte (quantidade real) é o número de exemplos da classe.
+Média macro atribui o mesmo peso a cada classe; a ponderada usa sua quantidade.
+Revisão humana não é um setor real da base: seus zeros usam zero_division=0.
+A média macro das regras acima inclui essa quinta linha, portanto não é uma
+comparação direta com a macro do ML. Considerando somente os quatro setores,
+a macro das regras é: precisão 1,0000; recall 0,8000; F1 0,8819.
+
+Matrizes de confusão: linhas são classes reais; colunas são previsões.
+ML principal — ordem: Estágio, Financeiro, Matrícula, Suporte.
+[5 0 0 0]
+[1 2 1 1]
+[0 2 3 0]
+[1 0 0 4]
+
+Regras — ordem: Estágio, Financeiro, Matrícula, Suporte, Revisão humana.
+[4 0 0 0 1]
+[0 5 0 0 0]
+[0 0 4 0 1]
+[0 0 0 3 2]
+[0 0 0 0 0]
+A última linha é zero porque não há rótulos reais de Revisão humana.
+
+O Financeiro foi a maior dificuldade do ML: acertou apenas 2 das 5 mensagens.
+Por exemplo, "Meu pagamento ainda não apareceu no sistema" foi classificada
+como Suporte, embora o rótulo seja Financeiro. Já "Não consigo recuperar a
+conta" foi corretamente classificada pelo ML como Suporte, enquanto as regras
+pediram revisão. Isso mostra a possibilidade de generalização do ML, sem
+significar que ele sempre interpreta corretamente o sentido da mensagem.
+
+4. OITO MENSAGENS DESAFIADORAS
+Saídas do modelo principal (unigramas e bigramas):
+ID    Regras           ML
+C01   Revisão humana   Suporte
+C02   Revisão humana   Financeiro
+C03   Matrícula        Matrícula
+C04   Estágio          Estágio
+C05   Estágio          Estágio
+C06   Matrícula        Matrícula
+C07   Suporte          Suporte
+C08   Revisão humana   Matrícula
+
+C01 — "Não posso acessar o boleto porque esqueci minha senha"
+Há boleto (Financeiro) e senha (Suporte), causando empate nas regras.
+A saída Suporte do ML é plausível porque recuperar a senha permite acessar o
+boleto. Política: confirmar a necessidade, tratar o acesso e encaminhar ao
+Financeiro se restar alguma questão de cobrança.
+
+C02 — "Preciso quitar a parcela do semestre"
+As regras não reconhecem "quitar" e "parcela". O ML sugeriu Financeiro,
+interpretação plausível. Política: revisão inicial e inclusão futura de
+exemplos de sinônimos, após validação, sem alterar este teste retroativamente.
+
+C03 — "Quero trocar de turma e revisar o vínculo"
+Ambos sugeriram Matrícula, compatível com os assuntos citados. A presença de
+dois pedidos não significa necessariamente dois setores diferentes.
+
+C04 — "Meu termo de compromisso precisa de assinatura"
+Ambos sugeriram Estágio. O termo de compromisso é uma pista pertinente,
+embora a palavra "termo" isoladamente possa aparecer em outros contextos.
+
+C05 — "O sistema caiu ao enviar o relatório de estágio"
+Ambos sugeriram Estágio, mas a falha do sistema indica uma necessidade técnica.
+A concordância não garante correção: os métodos podem priorizar o assunto do
+documento e ignorar a ação que falhou. Política: revisão humana, com provável
+atendimento inicial de Suporte e participação de Estágio se necessário.
+
+C06 — "Paguei a taxa mas a rematrícula continua pendente"
+Ambos sugeriram Matrícula, porém a mensagem envolve pagamento e matrícula.
+As regras não reconhecem "paguei" ou "taxa" como termos financeiros, e
+"rematrícula" corresponde também ao trecho "matrícula". Política: verificar
+se a pendência é de confirmação de pagamento ou de procedimento acadêmico;
+consultar Financeiro e Matrícula quando necessário.
+
+C07 — "O aplicativo apresenta falha ao autenticar"
+Ambos sugeriram Suporte, coerente com o problema técnico descrito.
+
+C08 — "Preciso saber onde registrar as horas da empresa"
+As regras pediram revisão; o ML sugeriu Matrícula. O texto pode tratar de horas
+de estágio, mas não explicita isso. Política: perguntar se são horas de estágio
+ou de outra atividade antes de encaminhar. A previsão do ML é questionável.
+
+Os desafios não possuem rótulos oficiais. As análises acima são interpretações
+qualitativas, não um gabarito nem uma acurácia adicional.
+
+5. EXPERIMENTO COM UNIGRAMAS
+Ao trocar apenas ngram_range=(1, 2) por (1, 1), a acurácia permaneceu em 70%.
+A média macro de precisão, recall e F1 foi 0,7000 para as três medidas.
+O F1 macro passou de 0,6861 para 0,7000, mas a acurácia ficou empatada.
+Matriz dos unigramas — ordem: Estágio, Financeiro, Matrícula, Suporte.
+[4 0 1 0]
+[0 3 1 1]
+[0 2 3 0]
+[1 0 0 4]
+O Financeiro passou de 2 para 3 acertos e Estágio de 5 para 4. Não há evidência
+suficiente para declarar um vencedor. Consultar repetidamente o mesmo teste
+para escolher parâmetros pode favorecer esse conjunto específico. Uma evolução
+seria escolher parâmetros por validação cruzada apenas no treino e reservar
+um novo teste independente para a avaliação final.
+
+6. PARECER FINAL (10 LINHAS)
+As regras superaram o ML em acurácia neste teste: 80% contra 70%.
+Essa vantagem se limita a 20 exemplos sintéticos; cada exemplo vale 5 pontos percentuais.
+As regras são transparentes, mas dependem dos termos e exigiram 20% de revisão.
+O ML reconheceu algumas frases sem palavras-chave, mas também errou encaminhamentos.
+A base pequena e artificial não representa toda a variedade do atendimento real.
+O LinearSVC usado sempre escolhe um setor; sua saída não é certeza nem probabilidade.
+Recomenda-se revisão para ausência de termos, empate, divergência ou múltiplos setores.
+Mesmo com concordância, casos como C05 exigem verificar qual problema precisa ser resolvido.
+Essa política ampliada é uma proposta; o código implementa a revisão por empate ou ausência.
+Antes de uso real, ampliar exemplos revisados por humanos e avaliar em dados independentes.
